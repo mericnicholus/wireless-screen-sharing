@@ -7,12 +7,12 @@
     <link rel="stylesheet" href="/shared/css/common.css">
     <link rel="stylesheet" href="/student/css/style.css">
     <style>
-        /* Inline critical CSS */
+        /* Inline critical CSS - Mbarara University Colors */
         body {
             margin: 0;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f5f5f5;
-            color: #333;
+            background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%);
+            color: #003D82;
             line-height: 1.6;
         }
         .container {
@@ -20,8 +20,29 @@
             margin: 0 auto;
             padding: 20px;
         }
+        header.app-header {
+            background: linear-gradient(135deg, #003D82 0%, #0055B8 100%);
+            color: white;
+            padding: 30px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 12px rgba(0,61,130,0.2);
+        }
+        header.app-header h1 {
+            margin: 0 0 15px 0;
+            font-size: 28px;
+            font-weight: 600;
+        }
+        .status {
+            background: rgba(253, 185, 19, 0.1) !important;
+            border: 2px solid #FDB913 !important;
+            color: #003D82 !important;
+            padding: 12px 15px !important;
+            border-radius: 6px !important;
+            font-weight: 500 !important;
+        }
         #screen {
-            background-color: #000;
+            background-color: #1a1a1a;
             width: 100%;
             aspect-ratio: 16/9;
             display: flex;
@@ -30,6 +51,8 @@
             color: #fff;
             position: relative;
             overflow: hidden;
+            border-radius: 8px;
+            box-shadow: 0 8px 24px rgba(0,61,130,0.15);
         }
         #screen img {
             max-width: 100%;
@@ -41,25 +64,180 @@
         #screen img.visible {
             opacity: 1;
         }
-        .status {
-            padding: 10px;
-            margin: 10px 0;
-            border-radius: 4px;
+        #screenMessage {
+            position: absolute;
+            font-size: 18px;
+            text-align: center;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            color: #FDB913;
             font-weight: 500;
         }
-        .status.connected { background-color: #d4edda; color: #155724; }
-        .status.connecting { background-color: #fff3cd; color: #856404; }
-        .status.disconnected { background-color: #f8d7da; color: #721c24; }
+        #screen img.visible ~ #screenMessage {
+            display: none !important;
+        }
+        .screen-controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            gap: 10px;
+            z-index: 100;
+        }
+        .control-btn {
+            background: rgba(0,0,0,0.6);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: white;
+            padding: 8px 14px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+        .control-btn:hover {
+            background: rgba(0,0,0,0.8);
+            border-color: rgba(255,255,255,0.6);
+        }
+        .control-btn:active {
+            transform: scale(0.95);
+        }
+        .control-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.3) 100%);
+            padding: 20px;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 50;
+            gap: 20px;
+        }
+        .left-controls {
+            flex: 1;
+        }
+        .center-controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        .right-controls {
+            flex: 1;
+            text-align: right;
+        }
+        .clock-display {
+            background: rgba(0,61,130,0.2);
+            border: 1px solid #FDB913;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            font-size: 14px;
+            display: inline-block;
+        }
+        #realTimeClock {
+            color: #FDB913;
+        }
+        .connection-indicator {
+            color: white;
+            font-weight: 500;
+            padding: 8px 12px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+        .connection-indicator.good {
+            background: rgba(40, 167, 69, 0.2);
+            border: 1px solid #28a745;
+        }
+        .connection-indicator.fair {
+            background: rgba(255, 193, 7, 0.2);
+            border: 1px solid #ffc107;
+        }
+        .connection-indicator.poor {
+            background: rgba(220, 53, 69, 0.2);
+            border: 1px solid #dc3545;
+        }
+        .reaction-popup {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.9);
+            padding: 10px;
+            border-radius: 8px;
+            display: flex;
+            gap: 5px;
+            z-index: 100;
+            border: 1px solid #FDB913;
+        }
+        .reaction-btn {
+            background: transparent;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 5px 8px;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+        }
+        .reaction-btn:hover {
+            background: rgba(253, 185, 19, 0.2);
+            transform: scale(1.2);
+        }
+        .raise-hand-notif {
+            position: fixed;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, #FDB913, #ffc107);
+            color: #003D82;
+            padding: 12px 20px;
+            border-radius: 8px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            z-index: 100;
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(0,61,130,0.2);
+        }
+        .lower-hand-btn {
+            background: rgba(0,61,130,0.2);
+            border: 1px solid #003D82;
+            color: #003D82;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        .lower-hand-btn:hover {
+            background: rgba(0,61,130,0.4);
+        }
+        /* Hide controls in fullscreen */
+        .screen-container:fullscreen .screen-controls {
+            position: fixed;
+        }
+        .screen-container:fullscreen ~ .control-footer {
+            display: none;
+        }
         .stats {
             margin-top: 20px;
-            padding: 15px;
-            background: #fff;
+            padding: 20px;
+            background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
             border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-left: 5px solid #FDB913;
+            box-shadow: 0 4px 12px rgba(0,61,130,0.1);
         }
         .stats h3 {
             margin-top: 0;
-            color: #2c3e50;
+            color: #003D82;
+            font-size: 18px;
         }
         #stats {
             display: grid;
@@ -69,9 +247,45 @@
         #stats p {
             margin: 5px 0;
             font-size: 14px;
+            color: #003D82;
         }
         #stats span {
             font-weight: 600;
+            color: #0055B8;
+        }
+        .stat-item {
+            padding: 10px;
+            background: rgba(253, 185, 19, 0.05);
+            border-radius: 4px;
+            border-left: 3px solid #FDB913;
+        }
+        /* Connection quality indicators */
+        #connectionQuality.good {
+            color: #28a745;
+            font-weight: 600;
+        }
+        #connectionQuality.fair {
+            color: #ffc107;
+            font-weight: 600;
+        }
+        #connectionQuality.poor {
+            color: #dc3545;
+            font-weight: 600;
+        }
+        .status.connected {
+            background: linear-gradient(135deg, #d4edda, #c3e6cb);
+            color: #155724;
+            border-left: 4px solid #28a745;
+        }
+        .status.connecting {
+            background: linear-gradient(135deg, #fff3cd, #ffeeba);
+            color: #856404;
+            border-left: 4px solid #ffc107;
+        }
+        .status.disconnected {
+            background: linear-gradient(135deg, #f8d7da, #f5c6cb);
+            color: #721c24;
+            border-left: 4px solid #dc3545;
         }
         .notification {
             position: fixed;
@@ -115,32 +329,47 @@
                 <div id="screen">
                     <img id="screenImage" alt="Shared screen content" />
                     <div id="screenMessage">Waiting for the lecturer to start sharing...</div>
+                    <div class="screen-controls">
+                        <div class="control-group">
+                            <button id="fullscreenBtn" class="control-btn fullscreen-btn" title="Toggle fullscreen">⛶ Fullscreen</button>
+                        </div>
+                    </div>
                 </div>
             </div>
             
-            <div class="stats">
-                <h3>Connection Statistics</h3>
-                <div id="stats">
-                    <div class="stat-item">
-                        <span>Frame Rate:</span> 
-                        <span id="frameRate">0</span> FPS
-                    </div>
-                    <div class="stat-item">
-                        <span>Latency:</span> 
-                        <span id="latency">-</span> ms
-                    </div>
-                    <div class="stat-item">
-                        <span>Connection Quality:</span> 
-                        <span id="connectionQuality" class="good">-</span>
-                    </div>
-                    <div class="stat-item">
-                        <span>Last Update:</span> 
-                        <span id="lastUpdate">-</span>
+            <!-- Google Meet style footer controls -->
+            <div class="control-footer">
+                <div class="left-controls">
+                    <div class="clock-display">
+                        <span id="realTimeClock">--:--:--</span>
                     </div>
                 </div>
-                <div id="error-display" class="error-message"></div>
+                <div class="center-controls">
+                    <button id="raiseHandBtn" class="control-btn raise-hand-btn" title="Raise hand">✋ Raise Hand</button>
+                    <button id="reactBtn" class="control-btn react-btn" title="Send reaction">👍</button>
+                    <button id="shareScreenBtn" class="control-btn share-screen-btn" title="Share your screen">📺 Share Screen</button>
+                </div>
+                <div class="right-controls">
+                    <span id="connectionStatus" class="connection-indicator good">● Connected</span>
+                </div>
             </div>
         </main>
+    </div>
+
+    <!-- Reaction popup -->
+    <div id="reactionPopup" class="reaction-popup" style="display: none;">
+        <button class="reaction-btn" data-reaction="👍">👍</button>
+        <button class="reaction-btn" data-reaction="❤️">❤️</button>
+        <button class="reaction-btn" data-reaction="😂">😂</button>
+        <button class="reaction-btn" data-reaction="🤔">🤔</button>
+        <button class="reaction-btn" data-reaction="🎉">🎉</button>
+        <button class="reaction-btn" data-reaction="🔥">🔥</button>
+    </div>
+
+    <!-- Raise hand notification -->
+    <div id="raiseHandNotif" class="raise-hand-notif" style="display: none;">
+        <span id="raiseHandText">✋ Hand raised</span>
+        <button id="lowerHandBtn" class="lower-hand-btn">Lower hand</button>
     </div>
 
     <!-- Error boundary for script loading -->

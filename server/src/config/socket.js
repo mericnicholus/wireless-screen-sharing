@@ -5,6 +5,7 @@ const clients = new Map();
 
 const broadcastClientCount = () => {
     const clientCount = clients.size;
+    console.log('📊 Broadcasting client count:', clientCount);
     io.emit('client-count', { count: clientCount });
 };
 
@@ -40,8 +41,7 @@ const setupSocketHandlers = () => {
             clientData.type = data.type;
             clientData.name = data.name || clientData.name;
             clientData.lastActivity = new Date();
-            console.log(`✅ ${data.type.toUpperCase()} identified: ${clientData.name}`);
-            
+            console.log(`✅ ${data.type.toUpperCase()} identified: ${clientData.name} (socket: ${socket.id})`);            
             if (data.type === 'lecturer') {
                 console.log('Broadcasting lecturer-connected event');
                 // Notify all clients about lecturer connection
@@ -59,15 +59,106 @@ const setupSocketHandlers = () => {
             console.log('Finished broadcasting client count');
         });
 
-        // Handle screen data from lecturer
+        
+                // Handle screen data from lecturer
         socket.on('screen-data', (data) => {
-            if (clientData.type === 'lecturer') {
-                // Broadcast to all clients except the sender
-                socket.broadcast.emit('screen-update', {
-                    ...data,
-                    senderId: socket.id,
-                    timestamp: new Date().toISOString()
+            console.log('📥 Server received screen-data from lecturer:', data ? 'has data' : 'no data');
+            if (data) {
+                console.log('Frame details:', {
+                    frameId: data.frameId,
+                    size: data.size ? `${(data.size / 1024).toFixed(1)}KB` : 'unknown',
+                    hasImage: !!data.image
                 });
+            }
+            if (clientData.type === 'lecturer') {
+                console.log('📤 Broadcasting screen-update to all students');
+                // Send to all clients except the lecturer
+                const targeted = [];
+                for (const [clientId, client] of clients) {
+                    if (client.type === 'student' && clientId !== socket.id) {
+                        io.to(clientId).emit('screen-update', {
+                            ...data,
+                            senderId: socket.id,
+                            timestamp: new Date().toISOString()
+                        });
+                        targeted.push(clientId);
+                    }
+                }
+
+                if (targeted.length > 0) {
+                    console.log(`✅ Broadcast completed to students: ${targeted.join(', ')}`);
+                } else {
+                    console.log('⚠️ No students found by type; falling back to broadcast to all other sockets');
+                    // Fallback: broadcast to all other connected sockets (except sender)
+                    socket.broadcast.emit('screen-update', {
+                        ...data,
+                        senderId: socket.id,
+                        timestamp: new Date().toISOString()
+                    });
+                    console.log('✅ Fallback broadcast sent to all other sockets');
+                }
+            } else {
+                console.log('⚠️ Non-lecturer client tried to send screen-data, type:', clientData.type);
+            }
+        });
+
+        // Handle screen data from student
+        socket.on('student-screen-data', (data) => {
+            console.log('📥 Server received student-screen-data:', data ? 'has data' : 'no data');
+            if (clientData.type === 'student') {
+                console.log('📤 Broadcasting student-screen-update to lecturer');
+                // Send to lecturer only
+                for (const [clientId, client] of clients) {
+                    if (client.type === 'lecturer') {
+                        io.to(clientId).emit('student-screen-update', {
+                            ...data,
+                            studentId: socket.id,
+                            timestamp: new Date().toISOString()
+                        });
+                    }
+                }
+                console.log('✅ Student screen broadcast sent to lecturer');
+            }
+        });
+
+        // Handle raised hand from student
+        socket.on('student-raised-hand', (data) => {
+            console.log('✋ Student raised hand:', data.name);
+            for (const [clientId, client] of clients) {
+                if (client.type === 'lecturer') {
+                    io.to(clientId).emit('student-raised-hand', {
+                        studentId: socket.id,
+                        name: data.name,
+                        timestamp: new Date().toISOString()
+                    });
+                }
+            }
+        });
+
+        // Handle lowered hand from student
+        socket.on('student-lowered-hand', () => {
+            console.log('🙋 Student lowered hand');
+            for (const [clientId, client] of clients) {
+                if (client.type === 'lecturer') {
+                    io.to(clientId).emit('student-lowered-hand', {
+                        studentId: socket.id,
+                        timestamp: new Date().toISOString()
+                    });
+                }
+            }
+        });
+
+        // Handle reaction from student
+        socket.on('student-reaction', (data) => {
+            console.log('😂 Student sent reaction:', data.emoji);
+            for (const [clientId, client] of clients) {
+                if (client.type === 'lecturer') {
+                    io.to(clientId).emit('student-reaction', {
+                        studentId: socket.id,
+                        emoji: data.emoji,
+                        timestamp: new Date().toISOString()
+                    });
+                }
             }
         });
 

@@ -34,6 +34,20 @@ app.get('/student', (req, res) => {
   res.sendFile(join(__dirname, '../../client/student/index.html'));
 });
 
+app.get('/test-display-media', (req, res) => {
+  res.sendFile(join(__dirname, '../../client/test-display-media.html'));
+});
+
+// Diagnostic route: list connected socket clients
+app.get('/clients', (req, res) => {
+  try {
+    const clients = socketServer.getClients();
+    res.json({ count: clients.length, clients });
+  } catch (err) {
+    res.status(500).json({ error: 'Socket server not initialized', details: err.message });
+  }
+});
+
 // Create HTTP server
 const server = http.createServer(app);
 

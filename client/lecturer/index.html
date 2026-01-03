@@ -7,23 +7,25 @@
     <link rel="stylesheet" href="/shared/css/common.css">
     <link rel="stylesheet" href="/lecturer/css/style.css">
     <style>
-        /* Critical CSS */
+        /* Critical CSS - Mbarara University Colors */
         :root {
-            --primary-color: #4a6bff;
-            --danger-color: #ff4a4a;
-            --success-color: #4caf50;
-            --warning-color: #ff9800;
-            --text-color: #333;
+            --primary-color: #003D82;
+            --primary-light: #0055B8;
+            --accent-color: #FDB913;
+            --danger-color: #dc3545;
+            --success-color: #28a745;
+            --warning-color: #ffc107;
+            --text-color: #003D82;
             --light-gray: #f5f5f5;
             --border-radius: 8px;
-            --box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            --box-shadow: 0 4px 12px rgba(0,61,130,0.15);
         }
         
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             line-height: 1.6;
             color: var(--text-color);
-            background-color: #f8f9fa;
+            background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%);
             margin: 0;
             padding: 0;
         }
@@ -37,17 +39,38 @@
         header {
             text-align: center;
             margin-bottom: 30px;
-            padding: 20px 0;
-            border-bottom: 1px solid #eee;
+            padding: 30px 20px;
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-light) 100%);
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            color: white;
         }
         
         h1 {
-            color: var(--primary-color);
+            color: white;
             margin: 0 0 10px;
+            font-size: 28px;
+        }
+        
+        @keyframes floatUp {
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            100% { transform: translateY(-100px) scale(0.5); opacity: 0; }
+        }
+        
+        @keyframes slideDown {
+            0% { transform: translateX(-50%) translateY(-20px); opacity: 0; }
+            100% { transform: translateX(-50%) translateY(0); opacity: 1; }
         }
         
         .status {
             display: inline-block;
+            background: rgba(253, 185, 19, 0.1);
+            border: 2px solid var(--accent-color);
+            color: var(--primary-color);
+            padding: 12px 20px;
+            border-radius: var(--border-radius);
+            font-weight: 500;
+        }
             padding: 8px 16px;
             border-radius: 20px;
             font-weight: 500;
@@ -228,6 +251,9 @@
             <div class="status" id="statusContainer">
                 Status: <span id="status">Not Connected</span>
             </div>
+            <div style="margin-top: 15px; font-size: 14px; color: rgba(255,255,255,0.9);">
+                <span id="lecturerClock" style="font-family: 'Courier New', monospace; font-weight: bold;">--:--:--</span>
+            </div>
         </header>
 
         <main>
@@ -262,6 +288,14 @@
                     <div class="control-group" style="display: flex; align-items: flex-end;">
                         <button id="stopSharing" class="btn btn-danger" disabled>Stop Sharing</button>
                     </div>
+                </div>
+            </div>
+
+            <!-- Student screens display -->
+            <div id="studentScreensContainer" style="display: none; margin-bottom: 30px;">
+                <h2>Student Screens</h2>
+                <div id="studentScreens" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px;">
+                    <!-- Student screen feeds will appear here -->
                 </div>
             </div>
 
@@ -318,10 +352,10 @@
 
     <!-- Scripts with proper attributes -->
     <!-- Scripts -->
-<script src="/socket.io/socket.io.js"></script>
-<script src="/shared/js/utils.js"></script>
-<script type="module" src="/lecturer/js/screenCapture.js"></script>
-<script type="module" src="/lecturer/js/app.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/shared/js/utils.js"></script>
+    <!-- `screenCapture.js` is imported by `app.js` via ES module import, avoid loading it twice -->
+    <script type="module" src="/lecturer/js/app.js"></script>
 
 </body>
 </html>

@@ -36,15 +36,285 @@ class StudentApp {
             connectionQuality: document.getElementById('connectionQuality'),
             errorDisplay: document.getElementById('error-display')
         };
+
+        // Create a visual flash element to indicate a received frame
+        try {
+            this.frameFlash = document.createElement('div');
+            this.frameFlash.id = 'frameFlash';
+            Object.assign(this.frameFlash.style, {
+                position: 'absolute',
+                inset: '0px',
+                border: '4px solid rgba(0,180,255,0)',
+                borderRadius: '6px',
+                pointerEvents: 'none',
+                transition: 'border-color 180ms ease',
+                zIndex: 999
+            });
+            if (this.elements.screen) {
+                this.elements.screen.style.position = this.elements.screen.style.position || 'relative';
+                this.elements.screen.appendChild(this.frameFlash);
+            } else {
+                document.body.appendChild(this.frameFlash);
+            }
+        } catch (e) {
+            console.warn('Could not create frame flash element', e);
+        }
         
         this.fpsCounter = new FPSCounter();
         this.initializeEventListeners();
+        this.setupFullscreenHandler();
+    }
+
+    setupFullscreenHandler() {
+        const fullscreenBtn = document.getElementById('fullscreenBtn');
+        const screenContainer = document.querySelector('.screen-container');
+        
+        if (!fullscreenBtn || !screenContainer) return;
+        
+        fullscreenBtn.addEventListener('click', async () => {
+            try {
+                if (!document.fullscreenElement) {
+                    // Enter fullscreen
+                    if (screenContainer.requestFullscreen) {
+                        await screenContainer.requestFullscreen();
+                        fullscreenBtn.textContent = '⛶ Exit Fullscreen';
+                    } else if (screenContainer.webkitRequestFullscreen) {
+                        screenContainer.webkitRequestFullscreen();
+                        fullscreenBtn.textContent = '⛶ Exit Fullscreen';
+                    }
+                } else {
+                    // Exit fullscreen
+                    if (document.exitFullscreen) {
+                        await document.exitFullscreen();
+                        fullscreenBtn.textContent = '⛶ Fullscreen';
+                    } else if (document.webkitExitFullscreen) {
+                        document.webkitExitFullscreen();
+                        fullscreenBtn.textContent = '⛶ Fullscreen';
+                    }
+                }
+            } catch (error) {
+                console.error('Fullscreen error:', error);
+            }
+        });
+        
+        // Update button text when fullscreen state changes
+        document.addEventListener('fullscreenchange', () => {
+            if (document.fullscreenElement) {
+                fullscreenBtn.textContent = '⛶ Exit Fullscreen';
+            } else {
+                fullscreenBtn.textContent = '⛶ Fullscreen';
+            }
+        });
     }
 
     initialize() {
         this.initializeSocket();
-        this.updateLastUpdated();
+        this.setupControlHandlers();
+        this.startRealtimeClock();
         this.startConnectionMonitor();
+    }
+
+    setupControlHandlers() {
+        // Raise hand button
+        const raiseHandBtn = document.getElementById('raiseHandBtn');
+        const lowerHandBtn = document.getElementById('lowerHandBtn');
+        const raiseHandNotif = document.getElementById('raiseHandNotif');
+        let handRaised = false;
+
+        if (raiseHandBtn) {
+            raiseHandBtn.addEventListener('click', () => {
+                handRaised = !handRaised;
+                if (handRaised) {
+                    raiseHandBtn.style.background = 'rgba(220, 53, 69, 0.3)';
+                    raiseHandBtn.style.borderColor = '#dc3545';
+                    raiseHandNotif.style.display = 'flex';
+                    if (this.socket && this.socket.connected) {
+                        this.socket.emit('student-raised-hand', { name: 'Student' });
+                    }
+                } else {
+                    raiseHandBtn.style.background = 'rgba(0,0,0,0.6)';
+                    raiseHandBtn.style.borderColor = 'rgba(255,255,255,0.3)';
+                    raiseHandNotif.style.display = 'none';
+                    if (this.socket && this.socket.connected) {
+                        this.socket.emit('student-lowered-hand', {});
+                    }
+                }
+            });
+        }
+
+        if (lowerHandBtn) {
+            lowerHandBtn.addEventListener('click', () => {
+                handRaised = false;
+                raiseHandBtn.style.background = 'rgba(0,0,0,0.6)';
+                raiseHandBtn.style.borderColor = 'rgba(255,255,255,0.3)';
+                raiseHandNotif.style.display = 'none';
+                if (this.socket && this.socket.connected) {
+                    this.socket.emit('student-lowered-hand', {});
+                }
+            });
+        }
+
+        // Reaction button
+        const reactBtn = document.getElementById('reactBtn');
+        const reactionPopup = document.getElementById('reactionPopup');
+        let showingReactions = false;
+
+        if (reactBtn) {
+            reactBtn.addEventListener('click', () => {
+                showingReactions = !showingReactions;
+                reactionPopup.style.display = showingReactions ? 'flex' : 'none';
+            });
+        }
+
+        const reactionBtns = document.querySelectorAll('.reaction-btn');
+        reactionBtns.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const reaction = e.target.dataset.reaction;
+                if (this.socket && this.socket.connected) {
+                    this.socket.emit('student-reaction', { emoji: reaction });
+                }
+                reactionPopup.style.display = 'none';
+                showingReactions = false;
+            });
+        });
+
+        // Share screen button
+        const shareScreenBtn = document.getElementById('shareScreenBtn');
+        let studentSharingStream = null;
+        let studentSharingActive = false;
+
+        if (shareScreenBtn) {
+            shareScreenBtn.addEventListener('click', async () => {
+                try {
+                    if (!studentSharingActive) {
+                        // Start sharing
+                        const stream = await navigator.mediaDevices.getDisplayMedia({
+                            video: { cursor: 'always' },
+                            audio: false
+                        });
+                        
+                        studentSharingStream = stream;
+                        studentSharingActive = true;
+                        shareScreenBtn.style.background = 'rgba(40, 167, 69, 0.3)';
+                        shareScreenBtn.style.borderColor = '#28a745';
+                        shareScreenBtn.textContent = '📺 Stop Sharing';
+                        
+                        console.log('✅ Student started screen sharing');
+                        this.startStudentScreenCapture(stream, shareScreenBtn);
+                        
+                        // Handle stream end (user stops sharing from browser)
+                        stream.getTracks()[0].onended = () => {
+                            studentSharingActive = false;
+                            studentSharingStream = null;
+                            shareScreenBtn.style.background = 'rgba(0,0,0,0.6)';
+                            shareScreenBtn.style.borderColor = 'rgba(255,255,255,0.3)';
+                            shareScreenBtn.textContent = '📺 Share Screen';
+                            this.stopStudentScreenCapture();
+                        };
+                    } else {
+                        // Stop sharing
+                        studentSharingActive = false;
+                        if (studentSharingStream) {
+                            studentSharingStream.getTracks().forEach(track => track.stop());
+                            studentSharingStream = null;
+                        }
+                        shareScreenBtn.style.background = 'rgba(0,0,0,0.6)';
+                        shareScreenBtn.style.borderColor = 'rgba(255,255,255,0.3)';
+                        shareScreenBtn.textContent = '📺 Share Screen';
+                        this.stopStudentScreenCapture();
+                        console.log('⏹ Student stopped screen sharing');
+                    }
+                } catch (error) {
+                    if (error.name !== 'NotAllowedError') {
+                        console.error('Share screen error:', error);
+                    }
+                    shareScreenBtn.style.background = 'rgba(0,0,0,0.6)';
+                    shareScreenBtn.style.borderColor = 'rgba(255,255,255,0.3)';
+                    shareScreenBtn.textContent = '📺 Share Screen';
+                }
+            });
+        }
+
+        // Close reaction popup on click outside
+        document.addEventListener('click', (e) => {
+            if (reactionPopup && !reactBtn?.contains(e.target) && !reactionPopup.contains(e.target)) {
+                reactionPopup.style.display = 'none';
+                showingReactions = false;
+            }
+        });
+    }
+
+    startStudentScreenCapture(stream, btn) {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const video = document.createElement('video');
+        
+        video.srcObject = stream;
+        video.play();
+        
+        let captureActive = true;
+        let frameId = 0;
+        
+        const captureFrame = async () => {
+            if (!captureActive || !ctx) return;
+            
+            try {
+                canvas.width = video.videoWidth || 1280;
+                canvas.height = video.videoHeight || 720;
+                
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                const imageData = canvas.toDataURL('image/jpeg', 0.5);
+                
+                // Send student screen frames to server
+                if (this.socket && this.socket.connected) {
+                    this.socket.emit('student-screen-data', {
+                        image: imageData,
+                        frameId: frameId++,
+                        timestamp: Date.now(),
+                        resolution: `${canvas.width}x${canvas.height}`,
+                        isStudentSharing: true
+                    });
+                }
+            } catch (error) {
+                console.error('Student frame capture error:', error);
+            }
+            
+            if (captureActive) {
+                requestAnimationFrame(captureFrame);
+            }
+        };
+        
+        video.onloadedmetadata = () => {
+            captureFrame();
+        };
+        
+        this.studentCaptureCleanup = () => {
+            captureActive = false;
+            video.srcObject = null;
+        };
+    }
+
+    stopStudentScreenCapture() {
+        if (this.studentCaptureCleanup) {
+            this.studentCaptureCleanup();
+            this.studentCaptureCleanup = null;
+        }
+    }
+
+    startRealtimeClock() {
+        const clockDisplay = document.getElementById('realTimeClock');
+        if (!clockDisplay) return;
+
+        const updateClock = () => {
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            clockDisplay.textContent = `${hours}:${minutes}:${seconds}`;
+        };
+
+        updateClock();
+        setInterval(updateClock, 1000);
     }
 
     initializeEventListeners() {
@@ -88,6 +358,15 @@ class StudentApp {
         });
 
         socket.on('screen-update', (data) => {
+            console.debug('📥 Student received raw screen-update event:', data);
+            console.log('📥 Student received screen-update event:', data ? 'has data' : 'no data');
+            if (data) {
+                console.log('Frame details:', {
+                    frameId: data.frameId,
+                    size: data.size ? `${(data.size / 1024).toFixed(1)}KB` : (data.image ? `${Math.round((data.image.length || 0)/1024)}KB (base64)` : 'unknown'),
+                    hasImage: !!data.image
+                });
+            }
             try {
                 this.handleScreenUpdate(data);
                 this.updateStats(data);
@@ -163,20 +442,40 @@ class StudentApp {
                 return;
             }
 
-            // Use requestAnimationFrame for smoother updates
+            // Ensure onload/onerror handlers are set before assigning src
             requestAnimationFrame(() => {
+                const messageEl = document.getElementById('screenMessage');
+                console.debug('Updating screen image. imageData length:', imageData ? imageData.length : 0);
+
+                img.onload = () => {
+                    this.lastFrameTime = performance.now();
+                    this.updateLastUpdated();
+                    img.classList.add('visible');
+                    if (messageEl) {
+                        messageEl.style.display = 'none';
+                        console.log('✅ Message hidden, image visible');
+                    }
+                    // Visual feedback: flash border when a new frame loads
+                    try {
+                        if (this.frameFlash) {
+                            this.frameFlash.style.borderColor = 'rgba(0,180,255,0.95)';
+                            setTimeout(() => {
+                                if (this.frameFlash) this.frameFlash.style.borderColor = 'rgba(0,180,255,0)';
+                            }, 120);
+                        }
+                    } catch (err) {
+                        console.debug('Frame flash failed', err);
+                    }
+                };
+
+                img.onerror = (e) => {
+                    console.error('Failed to load image:', e);
+                    this.showError('Failed to display screen');
+                };
+
+                // Assign src after handlers are attached
                 img.src = imageData;
-                if (!img.onload) {
-                    img.onload = () => {
-                        this.lastFrameTime = performance.now();
-                        this.updateLastUpdated();
-                        img.classList.add('visible');
-                    };
-                    img.onerror = (e) => {
-                        console.error('Failed to load image:', e);
-                        this.showError('Failed to display screen');
-                    };
-                }
+                console.debug('Assigned img.src');
             });
         } catch (error) {
             console.error('Error updating screen:', error);
@@ -185,34 +484,34 @@ class StudentApp {
     }
 
     updateStats(data) {
-        // Update FPS
-        const fps = this.fpsCounter.tick();
-        this.elements.frameRate.textContent = `${fps} FPS`;
-
-        // Update latency if timestamp is available
-        if (data.timestamp) {
-            const latency = Date.now() - data.timestamp;
-            this.elements.latency.textContent = `${latency}ms`;
-            this.updateConnectionQuality(latency, fps);
-        }
+        // Removed stats display from student side - kept for internal use
+        // This data is now only used for connection quality assessment
     }
 
     updateConnectionQuality(latency, fps) {
         let quality = 'good';
         let className = 'good';
         
-        if (latency > 500 || fps < 5) {
+        // More lenient thresholds for better user experience
+        // Good: 20+ FPS, <100ms latency
+        // Fair: 15+ FPS, <200ms latency
+        // Poor: Below fair thresholds
+        if (latency > 300 || fps < 12) {
             quality = 'poor';
             className = 'poor';
-        } else if (latency > 200 || fps < 10) {
+        } else if (latency > 150 || fps < 18) {
             quality = 'fair';
             className = 'fair';
         }
 
         if (quality !== this.connectionQuality) {
             this.connectionQuality = quality;
-            this.elements.connectionQuality.textContent = quality;
-            this.elements.connectionQuality.className = className;
+            const indicator = document.getElementById('connectionStatus');
+            if (indicator) {
+                indicator.className = `connection-indicator ${className}`;
+                const statusText = quality.charAt(0).toUpperCase() + quality.slice(1);
+                indicator.textContent = `● ${statusText}`;
+            }
         }
     }
 
@@ -222,8 +521,8 @@ class StudentApp {
     }
 
     updateLastUpdated() {
-        const now = new Date();
-        this.elements.lastUpdate.textContent = now.toLocaleTimeString();
+        // Method kept for compatibility but lastUpdate element no longer exists
+        // Time is now shown in the real-time clock instead
     }
 
     showError(message) {

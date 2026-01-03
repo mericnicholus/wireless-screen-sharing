@@ -4,96 +4,116 @@
  */
 class ScreenCapture {
     constructor(options = {}) {
-        this.stream = null;
-        this.videoElement = options.video || document.getElementById('previewVideo');
-        this.canvasElement = options.canvas || document.getElementById('previewCanvas');
-        this.ctx = this.canvasElement?.getContext('2d', { willReadFrequently: true });
-        this.socket = options.socket || null;
-        this.captureInterval = null;
-        this.rafId = null;
-        this.frameId = 0;
-        this.lastFrameTime = 0;
-        this.framesSent = 0;
-        this.totalDataSent = 0;
-        
-        // Performance metrics
-        this.metrics = {
-            fps: 0,
-            latency: 0,
-            quality: 0.7,
-            frameSize: 0,
-            droppedFrames: 0,
-            encodeTime: 0,
-            networkLatency: 0
-        };
-        
-        // Default settings
-        this.settings = {
-            quality: 0.7,
-            fps: 10,
-            resolution: '720p',
-            isSharing: false,
-            useCompression: true,
-            captureMethod: 'canvas',
-            frameSkip: 0,
-            frameSkipCount: 0,
-            maxFrameSize: 1.5 * 1024 * 1024,
-            autoAdjustQuality: true
-        };
-        
-        // Initialize settings from UI
-        this.initSettings();
-        this.initEventListeners();
+        try {
+            // Accept an existing stream if provided (avoids duplicate getDisplayMedia calls)
+            this.stream = options.stream || null;
+            this.videoElement = options.video || document.getElementById('previewVideo');
+            this.canvasElement = options.canvas || document.getElementById('previewCanvas');
+            this.ctx = this.canvasElement?.getContext('2d', { willReadFrequently: true });
+            this.socket = options.socket || null;
+            this.captureInterval = null;
+            this.rafId = null;
+            this.frameId = 0;
+            this.lastFrameTime = 0;
+            this.framesSent = 0;
+            this.totalDataSent = 0;
+            
+            // Performance metrics
+            this.metrics = {
+                fps: 0,
+                latency: 0,
+                quality: 0.5,
+                frameSize: 0,
+                droppedFrames: 0,
+                encodeTime: 0,
+                networkLatency: 0
+            };
+            
+            // Default settings
+            this.settings = {
+                quality: 0.5,
+                fps: 24,
+                resolution: '720p',
+                isSharing: false,
+                useCompression: true,
+                captureMethod: 'canvas',
+                frameSkip: 0,
+                frameSkipCount: 0,
+                maxFrameSize: 1.5 * 1024 * 1024,
+                autoAdjustQuality: true,
+                // Do not auto-pause when page/tab is hidden by default
+                pauseOnHide: false
+            };
+            
+            // Initialize settings from UI
+            this.initSettings();
+            this.initEventListeners();
+            console.log('ScreenCapture constructor completed successfully');
+        } catch (error) {
+            console.error('ScreenCapture constructor error:', error);
+            throw error;
+        }
     }
     
     initSettings() {
-        // Initialize UI controls
-        this.updateUISettings();
-        
-        // Add event listeners for UI controls
-        const qualitySlider = document.getElementById('qualitySlider');
-        const fpsSlider = document.getElementById('fpsSlider');
-        const resolutionSelect = document.getElementById('resolutionSelect');
-        const autoAdjustCheckbox = document.getElementById('autoAdjustQuality');
-        
-        if (qualitySlider) {
-            qualitySlider.addEventListener('input', (e) => {
-                this.settings.quality = parseFloat(e.target.value);
-                this.updateUISettings();
-            });
-        }
-        
-        if (fpsSlider) {
-            fpsSlider.addEventListener('input', (e) => {
-                this.settings.fps = parseInt(e.target.value);
-                this.updateUISettings();
-                this.restartCaptureIfNeeded();
-            });
-        }
-        
-        if (resolutionSelect) {
-            resolutionSelect.addEventListener('change', (e) => {
-                this.settings.resolution = e.target.value;
-                this.restartCaptureIfNeeded();
-            });
-        }
-        
-        if (autoAdjustCheckbox) {
-            autoAdjustCheckbox.addEventListener('change', (e) => {
-                this.settings.autoAdjustQuality = e.target.checked;
-            });
+        try {
+            // Initialize UI controls
+            this.updateUISettings();
+            
+            // Add event listeners for UI controls
+            const qualitySlider = document.getElementById('qualitySlider');
+            const fpsSlider = document.getElementById('fpsSlider');
+            const resolutionSelect = document.getElementById('resolutionSelect');
+            const autoAdjustCheckbox = document.getElementById('autoAdjustQuality');
+            
+            if (qualitySlider) {
+                qualitySlider.addEventListener('input', (e) => {
+                    this.settings.quality = parseFloat(e.target.value);
+                    this.updateUISettings();
+                });
+            }
+            
+            if (fpsSlider) {
+                fpsSlider.addEventListener('input', (e) => {
+                    this.settings.fps = parseInt(e.target.value);
+                    this.updateUISettings();
+                    this.restartCaptureIfNeeded();
+                });
+            }
+            
+            if (resolutionSelect) {
+                resolutionSelect.addEventListener('change', (e) => {
+                    this.settings.resolution = e.target.value;
+                    this.restartCaptureIfNeeded();
+                });
+            }
+            
+            if (autoAdjustCheckbox) {
+                autoAdjustCheckbox.addEventListener('change', (e) => {
+                    this.settings.autoAdjustQuality = e.target.checked;
+                });
+            }
+        } catch (error) {
+            console.error('Error in initSettings:', error);
+            throw error;
         }
     }
     
     initEventListeners() {
-        // Add visibility change handler
-        document.addEventListener('visibilitychange', () => {
-            if (document.hidden) {
-                this.pauseCapture();
-            } else if (this.settings.isSharing) {
-                this.resumeCapture();
-            }
-        });
+        try {
+            // Add visibility change handler (only active if pauseOnHide enabled)
+            document.addEventListener('visibilitychange', () => {
+                if (!this.settings.pauseOnHide) return;
+                if (document.hidden) {
+                    this.pauseCapture();
+                } else if (this.settings.isSharing) {
+                    this.resumeCapture();
+                }
+            });
+        } catch (error) {
+            console.error('Error in initEventListeners:', error);
+            throw error;
+        }
     }
     
     updateUISettings() {
@@ -118,21 +138,32 @@ class ScreenCapture {
     
     async startScreenCapture() {
         try {
+            // If a stream was provided when the instance was created, reuse it
             if (this.stream) {
-                await this.stopScreenCapture();
+                console.log('ScreenCapture: reusing provided stream');
+                // Ensure video element is set to the stream and ready
+                try {
+                    await this.setupVideoElement();
+                } catch (setupErr) {
+                    console.error('Error setting up video element for provided stream:', setupErr);
+                    throw setupErr;
+                }
+                this.startPerformanceMonitoring();
+                console.log('✅ Screen capture started successfully (reused stream)');
+                return true;
             }
-            
+
             console.log('🖥️ Starting screen capture...');
-            
+
             const displayMediaOptions = this.getDisplayMediaOptions();
             this.stream = await navigator.mediaDevices.getDisplayMedia(displayMediaOptions);
-            
+
             // Setup video element
             await this.setupVideoElement();
-            
+
             // Start performance monitoring
             this.startPerformanceMonitoring();
-            
+
             console.log('✅ Screen capture started successfully');
             return true;
             
@@ -186,13 +217,21 @@ class ScreenCapture {
         
         this.videoElement.srcObject = this.stream;
         
-        // Wait for video to be ready
-        await new Promise((resolve) => {
-            this.videoElement.onloadedmetadata = () => {
-                this.adjustCanvasSize();
-                resolve();
-            };
-        });
+        // Wait for video to be ready with timeout
+        await Promise.race([
+            new Promise((resolve) => {
+                this.videoElement.onloadedmetadata = () => {
+                    console.log('Video metadata loaded');
+                    this.adjustCanvasSize();
+                    resolve();
+                };
+            }),
+            new Promise((_, reject) => {
+                setTimeout(() => {
+                    reject(new Error('Video element metadata loading timeout (5s)'));
+                }, 5000);
+            })
+        ]);
     }
     
     adjustCanvasSize() {
@@ -257,11 +296,38 @@ class ScreenCapture {
         this.rafId = requestAnimationFrame(captureFrame);
         console.log(`🎬 Capture started at ${this.settings.fps} FPS`);
         console.log(`Socket status: connected=${this.socket?.connected}, socket=${this.socket ? 'exists' : 'null'}`);
+        
+        // Set sharing flag so real frames will send
+        this.settings.isSharing = true;
+        console.log('✅ isSharing flag set to true');
+        
+        // Test frame system disabled - real frames are now flowing
+        // Uncomment below to re-enable test frames for diagnostics
+        /*
+        console.log('Setting up test emit interval...');
+        if (this.testEmitInterval) clearInterval(this.testEmitInterval);
+        this.testEmitInterval = setInterval(() => {
+            console.log('🧪 Test interval fired, isSharing=', this.settings.isSharing);
+            if (!this.settings.isSharing) {
+                console.log('🧪 Not sharing, skipping test frame');
+                return;
+            }
+            console.log('🧪 Calling sendTestFrame...');
+            this.sendTestFrame();
+        }, 2000);
+        console.log('✅ Test emit interval set:', this.testEmitInterval);
+        */
+        
         return true;
     }
     
     async captureAndProcessFrame() {
         if (!this.settings.isSharing || !this.ctx || !this.videoElement) {
+            console.debug('captureAndProcessFrame: exiting early, checks:', {
+                isSharing: this.settings.isSharing,
+                hasCtx: !!this.ctx,
+                hasVideo: !!this.videoElement
+            });
             return null;
         }
         
@@ -269,6 +335,13 @@ class ScreenCapture {
         let frameData = null;
         
         try {
+            console.debug('captureAndProcessFrame: video size', {
+                videoWidth: this.videoElement.videoWidth,
+                videoHeight: this.videoElement.videoHeight,
+                canvasW: this.canvasElement ? this.canvasElement.width : 0,
+                canvasH: this.canvasElement ? this.canvasElement.height : 0,
+                fps: this.settings.fps
+            });
             // Skip frames if needed
             if (this.settings.frameSkip > 0) {
                 this.settings.frameSkipCount = (this.settings.frameSkipCount + 1) % (this.settings.frameSkip + 1);
@@ -278,17 +351,24 @@ class ScreenCapture {
             }
             
             // Draw frame to canvas
-            this.ctx.drawImage(
-                this.videoElement,
-                0, 0,
-                this.canvasElement.width,
-                this.canvasElement.height
-            );
+            try {
+                this.ctx.drawImage(
+                    this.videoElement,
+                    0, 0,
+                    this.canvasElement.width,
+                    this.canvasElement.height
+                );
+            } catch (drawErr) {
+                console.error('Error drawing video to canvas:', drawErr);
+                return null;
+            }
             
             // Encode frame to JPEG
             const encodeStart = performance.now();
             const imageData = await this.encodeFrame();
             const encodeTime = performance.now() - encodeStart;
+
+            console.debug('encodeFrame result length:', imageData ? (imageData.length || imageData.byteLength || 0) : 0);
             
             if (!imageData) return null;
             
@@ -366,6 +446,13 @@ class ScreenCapture {
         }
 
         try {
+            // Debug: log frame send attempt
+            try {
+                const len = frameData.image ? (frameData.image.length || frameData.image.byteLength || 0) : 0;
+                console.debug(`➡️ Sending frame ${frameData.frameId}, size=${len}`);
+            } catch (logErr) {
+                console.debug('➡️ Sending frame (size unknown) frameId=', frameData.frameId);
+            }
             this.socket.emit('screen-data', {
                 image: frameData.image,
                 frameId: frameData.frameId,
@@ -490,11 +577,58 @@ class ScreenCapture {
         this.startCapture();
         console.log('▶️ Capture resumed');
     }
-    
+
+    sendTestFrame() {
+        console.log('sendTestFrame called. socket:', this.socket ? 'exists' : 'null', 'connected:', this.socket?.connected);
+        
+        if (!this.socket || !this.socket.connected) {
+            console.warn('🧪 Test frame: socket not connected', { socket: !!this.socket, connected: this.socket?.connected });
+            return;
+        }
+        
+        try {
+            // Create a simple test canvas with text
+            const testCanvas = document.createElement('canvas');
+            testCanvas.width = 400;
+            testCanvas.height = 200;
+            const ctx = testCanvas.getContext('2d');
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, 400, 200);
+            ctx.fillStyle = '#0ff';
+            ctx.font = '24px monospace';
+            ctx.fillText(`🧪 TEST FRAME #${this.frameId}`, 20, 50);
+            ctx.fillText(`Time: ${new Date().toLocaleTimeString()}`, 20, 100);
+            ctx.fillStyle = '#0f0';
+            ctx.font = '14px monospace';
+            ctx.fillText('If you see this on the student screen, relay is working!', 20, 150);
+            
+            const testImageData = testCanvas.toDataURL('image/jpeg', 0.8);
+            
+            console.log(`🧪 Sending test frame #${this.frameId}, size=${testImageData.length}`);
+            
+            this.socket.emit('screen-data', {
+                image: testImageData,
+                frameId: this.frameId++,
+                timestamp: Date.now(),
+                size: testImageData.length,
+                quality: 0.8,
+                resolution: { width: 400, height: 200 }
+            });
+            console.log('✅ Test frame emitted');
+        } catch (error) {
+            console.error('❌ Error sending test frame:', error);
+        }
+    }
+
     stopCapture() {
         if (this.rafId) {
             cancelAnimationFrame(this.rafId);
             this.rafId = null;
+        }
+        
+        if (this.testEmitInterval) {
+            clearInterval(this.testEmitInterval);
+            this.testEmitInterval = null;
         }
         
         this.settings.isSharing = false;

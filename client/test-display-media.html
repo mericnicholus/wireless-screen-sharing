@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Display Media Test</title>
+    <style>
+        body { font-family: Arial; padding: 20px; }
+        button { padding: 10px 20px; font-size: 16px; margin: 10px 0; }
+        #output { border: 1px solid #ccc; padding: 10px; margin: 10px 0; height: 300px; overflow-y: auto; font-family: monospace; white-space: pre-wrap; }
+        video { max-width: 100%; max-height: 400px; background: black; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h1>Display Media API Test</h1>
+    <button onclick="testDisplayMedia()">Test Screen Capture (getDisplayMedia)</button>
+    <button onclick="stopCapture()">Stop Capture</button>
+    <button onclick="clearLog()">Clear Log</button>
+    
+    <h3>Output:</h3>
+    <div id="output"></div>
+    
+    <h3>Video Preview:</h3>
+    <video id="preview" autoplay muted></video>
+
+    <script>
+        let stream = null;
+        
+        function log(msg) {
+            const output = document.getElementById('output');
+            const timestamp = new Date().toLocaleTimeString();
+            output.textContent += `[${timestamp}] ${msg}\n`;
+            output.scrollTop = output.scrollHeight;
+            console.log(msg);
+        }
+        
+        function clearLog() {
+            document.getElementById('output').textContent = '';
+        }
+        
+        async function testDisplayMedia() {
+            log('Starting getDisplayMedia test...');
+            log('Browser: ' + navigator.userAgent);
+            
+            try {
+                log('Requesting display media with full constraints...');
+                const constraints = {
+                    video: {
+                        displaySurface: 'monitor',
+                        frameRate: { ideal: 10, max: 30 },
+                        width: { ideal: 1280, max: 1920 },
+                        height: { ideal: 720, max: 1080 },
+                        resizeMode: 'none'
+                    },
+                    audio: false
+                };
+                log('Constraints: ' + JSON.stringify(constraints, null, 2));
+                
+                stream = await navigator.mediaDevices.getDisplayMedia(constraints);
+                log('✅ SUCCESS: getDisplayMedia returned a stream!');
+                
+                const videoTrack = stream.getVideoTracks()[0];
+                if (videoTrack) {
+                    const settings = videoTrack.getSettings();
+                    log('Video track settings:');
+                    log('  Width: ' + settings.width);
+                    log('  Height: ' + settings.height);
+                    log('  Frame Rate: ' + settings.frameRate);
+                    
+                    const constraints = videoTrack.getConstraints();
+                    log('Video track constraints: ' + JSON.stringify(constraints, null, 2));
+                }
+                
+                const video = document.getElementById('preview');
+                video.srcObject = stream;
+                log('Video element srcObject set, waiting for playback...');
+                
+                await video.play();
+                log('✅ Video is playing!');
+                
+            } catch (error) {
+                log('❌ ERROR: ' + error.name);
+                log('Message: ' + error.message);
+                log('Stack: ' + error.stack);
+                
+                // Try with minimal constraints
+                log('');
+                log('Retrying with minimal constraints...');
+                try {
+                    stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+                    log('✅ SUCCESS with minimal constraints!');
+                    
+                    const video = document.getElementById('preview');
+                    video.srcObject = stream;
+                    await video.play();
+                    log('✅ Video is playing with minimal constraints!');
+                    
+                } catch (retryError) {
+                    log('❌ RETRY FAILED: ' + retryError.name + ' - ' + retryError.message);
+                }
+            }
+        }
+        
+        function stopCapture() {
+            if (stream) {
+                stream.getTracks().forEach(track => {
+                    track.stop();
+                    log('Stopped track: ' + track.kind);
+                });
+                stream = null;
+                document.getElementById('preview').srcObject = null;
+                log('Capture stopped');
+            }
+        }
+        
+        log('Display Media Test Page Loaded');
+        log('Click "Test Screen Capture" button to begin');
+    </script>
+</body>
+</html>
